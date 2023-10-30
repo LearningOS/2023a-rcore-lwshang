@@ -41,3 +41,30 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }
+
+/// number of implemented syscall
+pub const NUM_IMPLEMENTED_SYSCALLS: usize = 5;
+
+/// get dense id from the syscall id
+pub const fn syscall_id_to_dense(syscall_id: usize) -> usize {
+    match syscall_id {
+        SYSCALL_WRITE => 0,
+        SYSCALL_EXIT => 1,
+        SYSCALL_YIELD => 2,
+        SYSCALL_GET_TIME => 3,
+        SYSCALL_TASK_INFO => 4,
+        _ => unreachable!(),
+    }
+}
+
+/// get syscall id from the dense id
+pub const fn syscall_id_from_dense(dense_id: usize) -> usize {
+    match dense_id {
+        0 => SYSCALL_WRITE,
+        1 => SYSCALL_EXIT,
+        2 => SYSCALL_YIELD,
+        3 => SYSCALL_GET_TIME,
+        4 => SYSCALL_TASK_INFO,
+        _ => unreachable!(),
+    }
+}

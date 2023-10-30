@@ -14,9 +14,10 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
+use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::syscall::{syscall_id_to_dense, NUM_IMPLEMENTED_SYSCALLS};
 use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
@@ -55,7 +56,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
-            syscall_times: [0;MAX_SYSCALL_NUM],
+            dense_syscall_times: [0;NUM_IMPLEMENTED_SYSCALLS],
             start_time: 0,
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
@@ -152,19 +153,19 @@ impl TaskManager {
     fn count_syscall(&self, syscall_id: usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        inner.tasks[current].syscall_times[syscall_id] += 1;
+        inner.tasks[current].dense_syscall_times[syscall_id_to_dense(syscall_id)] += 1;
         drop(inner);
     }
 
     /// Get the value of TaskInfo fields of current task.
-    fn get_task_info(&self) -> (TaskStatus, [u32; MAX_SYSCALL_NUM], usize) {
+    fn get_task_info(&self) -> (TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let current_task_tcb = &mut inner.tasks[current];
         let current_time = get_time_ms();
         let res = (
             current_task_tcb.task_status,
-            current_task_tcb.syscall_times,
+            current_task_tcb.dense_syscall_times,
             current_time - current_task_tcb.start_time,
         );
         drop(inner);
@@ -211,6 +212,6 @@ pub fn count_syscall(syscall_id: usize) {
 }
 
 /// Get the value of TaskInfo fields of current task.
-pub fn get_task_info() -> (TaskStatus, [u32; MAX_SYSCALL_NUM], usize) {
+pub fn get_task_info() -> (TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize) {
     TASK_MANAGER.get_task_info()
 }

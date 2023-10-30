@@ -1,7 +1,7 @@
 //! Types related to task management
 
 use super::TaskContext;
-use crate::config::MAX_SYSCALL_NUM;
+use crate::syscall::NUM_IMPLEMENTED_SYSCALLS;
 
 /// The task control block (TCB) of a task.
 #[derive(Copy, Clone)]
@@ -11,7 +11,9 @@ pub struct TaskControlBlock {
     /// The task context
     pub task_cx: TaskContext,
     /// The numbers of syscall called by task
-    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    ///
+    /// Indexed by [crate::syscall::dense_id_syscall]
+    pub dense_syscall_times: [u32; NUM_IMPLEMENTED_SYSCALLS],
     /// The time when this task start
     pub start_time: usize,
 }
