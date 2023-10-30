@@ -148,27 +148,20 @@ impl TaskManager {
         }
     }
 
-    ///
+    /// Count a syscall from current task.
     fn count_syscall(&self, syscall_id: usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        // let current_task = &mut inner.tasks[current];
-        // current_task.syscall_times[syscall_id] += 1;
         inner.tasks[current].syscall_times[syscall_id] += 1;
         drop(inner);
     }
 
-    ///
+    /// Get the value of TaskInfo fields of current task.
     fn get_task_info(&self) -> (TaskStatus, [u32; MAX_SYSCALL_NUM], usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let current_task_tcb = &mut inner.tasks[current];
         let current_time = get_time_ms();
-        // unsafe {
-        //     (*ti).time = current_time - current_task_tcb.start_time;
-        //     (*ti).syscall_times = current_task_tcb.syscall_times;
-        //     (*ti).status = current_task_tcb.task_status; // This will alwasy be Running?
-        // }
         let res = (
             current_task_tcb.task_status,
             current_task_tcb.syscall_times,
@@ -212,12 +205,12 @@ pub fn exit_current_and_run_next() {
     run_next_task();
 }
 
-///
+/// Count a syscall from current task.
 pub fn count_syscall(syscall_id: usize) {
     TASK_MANAGER.count_syscall(syscall_id);
 }
 
-///
+/// Get the value of TaskInfo fields of current task.
 pub fn get_task_info() -> (TaskStatus, [u32; MAX_SYSCALL_NUM], usize) {
     TASK_MANAGER.get_task_info()
 }
