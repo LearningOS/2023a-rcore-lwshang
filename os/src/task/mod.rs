@@ -57,7 +57,7 @@ lazy_static! {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
             dense_syscall_times: [0;NUM_IMPLEMENTED_SYSCALLS],
-            start_time: 0,
+            start_time: None,
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -85,7 +85,7 @@ impl TaskManager {
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
-        task0.start_time = get_time_ms();
+        task0.start_time = Some(get_time_ms());
         drop(inner);
         let mut _unused = TaskContext::zero_init();
         // before this, we should drop local variables that must be dropped manually
@@ -130,12 +130,8 @@ impl TaskManager {
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_start_time = &mut inner.tasks[next].start_time;
-            if *next_task_start_time == 0 {
-                *next_task_start_time = get_time_ms();
-                debug!(
-                    "set task = {:#x} start_time = {:#x}",
-                    next, next_task_start_time
-                );
+            if next_task_start_time.is_none() {
+                *next_task_start_time = Some(get_time_ms());
             }
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
@@ -158,16 +154,21 @@ impl TaskManager {
     }
 
     /// Get the value of TaskInfo fields of current task.
-    fn get_task_info(&self) -> (TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize) {
+    fn get_task_info(&self) -> Option<(TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize)> {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let current_task_tcb = &mut inner.tasks[current];
-        let current_time = get_time_ms();
-        let res = (
-            current_task_tcb.task_status,
-            current_task_tcb.dense_syscall_times,
-            current_time - current_task_tcb.start_time,
-        );
+        let res;
+        if let Some(start_time) = current_task_tcb.start_time {
+            let current_time: usize = get_time_ms();
+            res = Some((
+                current_task_tcb.task_status,
+                current_task_tcb.dense_syscall_times,
+                current_time - start_time,
+            ));
+        } else {
+            res = None;
+        }
         drop(inner);
         res
     }
@@ -212,6 +213,6 @@ pub fn count_syscall(syscall_id: usize) {
 }
 
 /// Get the value of TaskInfo fields of current task.
-pub fn get_task_info() -> (TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize) {
+pub fn get_task_info() -> Option<(TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize)> {
     TASK_MANAGER.get_task_info()
 }

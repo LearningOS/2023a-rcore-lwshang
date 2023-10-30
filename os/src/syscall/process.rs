@@ -54,17 +54,20 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// get [TaskInfo] of the task
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
-    let (status, dense_syscall_times, time) = get_task_info();
-    let mut syscall_times = [0; MAX_SYSCALL_NUM];
-    for (i, n) in dense_syscall_times.iter().enumerate() {
-        syscall_times[syscall_id_from_dense(i)] = *n;
-    }
-    unsafe {
-        *ti = TaskInfo {
-            status,
-            syscall_times,
-            time,
+    if let Some((status, dense_syscall_times, time)) = get_task_info() {
+        let mut syscall_times = [0; MAX_SYSCALL_NUM];
+        for (i, n) in dense_syscall_times.iter().enumerate() {
+            syscall_times[syscall_id_from_dense(i)] = *n;
         }
+        unsafe {
+            *ti = TaskInfo {
+                status,
+                syscall_times,
+                time,
+            }
+        }
+        0
+    } else {
+        -1
     }
-    0
 }

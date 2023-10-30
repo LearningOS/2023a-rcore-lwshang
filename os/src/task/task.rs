@@ -14,8 +14,8 @@ pub struct TaskControlBlock {
     ///
     /// Indexed by [crate::syscall::dense_id_syscall]
     pub dense_syscall_times: [u32; NUM_IMPLEMENTED_SYSCALLS],
-    /// The time when this task start
-    pub start_time: usize,
+    /// The time (ms) when this task start
+    pub start_time: Option<usize>,
 }
 
 /// The status of a task
