@@ -16,6 +16,8 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
+use crate::syscall::{syscall_id_to_dense, NUM_IMPLEMENTED_SYSCALLS};
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -141,6 +143,10 @@ impl TaskManager {
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
+            let next_task_start_time = &mut inner.tasks[next].start_time;
+            if next_task_start_time.is_none() {
+                *next_task_start_time = Some(get_time_us());
+            }
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
@@ -152,6 +158,27 @@ impl TaskManager {
         } else {
             panic!("All applications completed!");
         }
+    }
+
+    /// Count a syscall from current task.
+    fn count_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].dense_syscall_times[syscall_id_to_dense(syscall_id)] += 1;
+    }
+
+    /// Get the value of TaskInfo fields of current task.
+    fn get_task_info(&self) -> Option<(TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize)> {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let current_task_tcb = &mut inner.tasks[current];
+        current_task_tcb.start_time.map(|start_time| {
+            (
+                current_task_tcb.task_status,
+                current_task_tcb.dense_syscall_times,
+                (get_time_us() - start_time) / 1000,
+            )
+        })
     }
 }
 
@@ -201,4 +228,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// Count a syscall from current task.
+pub fn count_syscall(syscall_id: usize) {
+    TASK_MANAGER.count_syscall(syscall_id);
+}
+
+/// Get the value of TaskInfo fields of current task.
+pub fn get_task_info() -> Option<(TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize)> {
+    TASK_MANAGER.get_task_info()
 }

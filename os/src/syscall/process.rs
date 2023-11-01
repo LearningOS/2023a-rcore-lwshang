@@ -1,6 +1,7 @@
 //! Process management syscalls
 use crate::mm::translated_byte_buffer;
-use crate::task::current_user_token;
+use crate::syscall::syscall_id_from_dense;
+use crate::task::{current_user_token, get_task_info};
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
@@ -57,9 +58,22 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    if let Some((status, dense_syscall_times, time)) = get_task_info() {
+        let mut syscall_times = [0; MAX_SYSCALL_NUM];
+        for (i, n) in dense_syscall_times.iter().enumerate() {
+            syscall_times[syscall_id_from_dense(i)] = *n;
+        }
+        let task_info = TaskInfo {
+            status,
+            syscall_times,
+            time,
+        };
+        set_val_in_user_memory(ti, &task_info)
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Implement mmap.
