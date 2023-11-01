@@ -1,9 +1,12 @@
 //! Process management syscalls
+use crate::mm::translated_byte_buffer;
+use crate::task::current_user_token;
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
     },
+    timer::get_time_us,
 };
 
 #[repr(C)]
@@ -41,9 +44,14 @@ pub fn sys_yield() -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+    let us = get_time_us();
+    let time_val = TimeVal {
+        sec: us / 1_000_000,
+        usec: us % 1_000_000,
+    };
+    set_val_in_user_memory(ts, &time_val)
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -70,6 +78,28 @@ pub fn sys_sbrk(size: i32) -> isize {
     trace!("kernel: sys_sbrk");
     if let Some(old_brk) = change_program_brk(size) {
         old_brk as isize
+    } else {
+        -1
+    }
+}
+
+unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
+}
+
+fn set_val_in_user_memory<T: Sized>(ptr: *mut T, val: &T) -> isize {
+    let len = core::mem::size_of::<T>();
+    let buffers = translated_byte_buffer(current_user_token(), ptr as *const u8, len);
+    let value_bytes = unsafe { any_as_u8_slice(val) };
+    let mut start = 0;
+    for buffer in buffers {
+        let buffer_size = buffer.len();
+        let end = start + buffer_size;
+        buffer.copy_from_slice(&value_bytes[start..end]);
+        start = end;
+    }
+    if start == len {
+        0
     } else {
         -1
     }
