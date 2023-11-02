@@ -204,7 +204,6 @@ impl TaskManager {
             }
         }
 
-        // TODO: port <-> MapPermission
         let map_permission =
             MapPermission::from_bits((port as u8) << 1).unwrap() | MapPermission::U;
 
