@@ -40,9 +40,7 @@ pub fn sys_yield() -> isize {
     0
 }
 
-/// YOUR JOB: get time with second and microsecond
-/// HINT: You might reimplement it with virtual memory management.
-/// HINT: What if [`TimeVal`] is splitted by two pages ?
+/// current time in the format of [TimeVal]
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
     let us = get_time_us();
@@ -53,9 +51,7 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     set_val_in_user_memory(ts, &time_val)
 }
 
-/// YOUR JOB: Finish sys_task_info to pass testcases
-/// HINT: You might reimplement it with virtual memory management.
-/// HINT: What if [`TaskInfo`] is splitted by two pages ?
+/// get [TaskInfo] of current task
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
     if let Some((status, dense_syscall_times, time)) = get_task_info() {
@@ -74,13 +70,17 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     }
 }
 
-// YOUR JOB: Implement mmap.
+/// map files or devices into memory
+///
+/// This is a simplified version which only allocate memory
 pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
     mmap(start, len, port)
 }
 
-// YOUR JOB: Implement munmap.
+/// unmap files or devices into memory
+///
+/// This is a simplified version which only deallocate memory
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
     munmap(start, len)
