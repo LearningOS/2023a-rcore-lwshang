@@ -1,14 +1,12 @@
 //! Process management syscalls
+use crate::config::MAX_SYSCALL_NUM;
 use crate::mm::translated_byte_buffer;
 use crate::syscall::syscall_id_from_dense;
-use crate::task::{current_user_token, get_task_info};
-use crate::{
-    config::MAX_SYSCALL_NUM,
-    task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
-    },
-    timer::get_time_us,
+use crate::task::{
+    change_program_brk, current_user_token, exit_current_and_run_next, get_task_info, mmap, munmap,
+    suspend_current_and_run_next, TaskStatus,
 };
+use crate::timer::get_time_us;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -77,16 +75,17 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 }
 
 // YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    mmap(start, len, port)
 }
 
 // YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
+pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    munmap(start, len)
 }
+
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
     trace!("kernel: sys_sbrk");

@@ -15,6 +15,7 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, VPNRange, VirtAddr};
 use crate::sync::UPSafeCell;
 use crate::syscall::{syscall_id_to_dense, NUM_IMPLEMENTED_SYSCALLS};
 use crate::timer::get_time_us;
@@ -115,7 +116,6 @@ impl TaskManager {
             .map(|id| id % self.num_app)
             .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
     }
-
     /// Get the current 'Running' task's token.
     fn get_current_token(&self) -> usize {
         let inner = self.inner.exclusive_access();
@@ -180,6 +180,67 @@ impl TaskManager {
             )
         })
     }
+
+    /// mmap
+    fn mmap(&self, start: usize, len: usize, port: usize) -> isize {
+        let start_va: VirtAddr = start.into();
+        if !start_va.aligned() || port & !0x7 != 0 || port & 0x7 == 0 {
+            return -1;
+        }
+
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let tcb = &mut inner.tasks[current];
+
+        let start_vpn = start_va.floor();
+        let end_va: VirtAddr = (start_va.0 + len).into();
+        let end_vpn = end_va.ceil();
+
+        for vpn in VPNRange::new(start_vpn, end_vpn) {
+            if let Some(pte) = tcb.memory_set.translate(vpn) {
+                if pte.is_valid() {
+                    return -1;
+                }
+            }
+        }
+
+        // TODO: port <-> MapPermission
+        let map_permission =
+            MapPermission::from_bits((port as u8) << 1).unwrap() | MapPermission::U;
+
+        tcb.memory_set
+            .insert_framed_area(start_va, end_va, map_permission);
+
+        0
+    }
+
+    /// munmap
+    fn munmap(&self, start: usize, len: usize) -> isize {
+        let start_va: VirtAddr = start.into();
+        if !start_va.aligned() {
+            return -1;
+        }
+
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let tcb = &mut inner.tasks[current];
+
+        let start_vpn = start_va.floor();
+        let end_va: VirtAddr = (start_va.0 + len).into();
+        let end_vpn = end_va.ceil();
+
+        for vpn in VPNRange::new(start_vpn, end_vpn) {
+            if let Some(pte) = tcb.memory_set.translate(vpn) {
+                if !pte.is_valid() {
+                    return -1;
+                }
+            } else {
+                return -1;
+            }
+        }
+
+        tcb.memory_set.remove_framed_area(start_va, end_va)
+    }
 }
 
 /// Run the first task in task list.
@@ -238,4 +299,14 @@ pub fn count_syscall(syscall_id: usize) {
 /// Get the value of TaskInfo fields of current task.
 pub fn get_task_info() -> Option<(TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize)> {
     TASK_MANAGER.get_task_info()
+}
+
+/// mmap
+pub fn mmap(start: usize, len: usize, port: usize) -> isize {
+    TASK_MANAGER.mmap(start, len, port)
+}
+
+/// munmap
+pub fn munmap(start: usize, len: usize) -> isize {
+    TASK_MANAGER.munmap(start, len)
 }
