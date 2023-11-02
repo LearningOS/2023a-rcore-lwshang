@@ -14,10 +14,10 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::MAX_SYSCALL_NUM;
 use crate::loader::{get_app_data, get_num_app};
 use crate::mm::{MapPermission, VPNRange, VirtAddr};
 use crate::sync::UPSafeCell;
-use crate::syscall::{syscall_id_to_dense, NUM_IMPLEMENTED_SYSCALLS};
 use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -164,18 +164,18 @@ impl TaskManager {
     fn count_syscall(&self, syscall_id: usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        inner.tasks[current].dense_syscall_times[syscall_id_to_dense(syscall_id)] += 1;
+        inner.tasks[current].syscall_times[syscall_id] += 1;
     }
 
     /// Get the value of TaskInfo fields of current task.
-    fn get_task_info(&self) -> Option<(TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize)> {
+    fn get_task_info(&self) -> Option<(TaskStatus, [u32; MAX_SYSCALL_NUM], usize)> {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let current_task_tcb = &mut inner.tasks[current];
         current_task_tcb.start_time.map(|start_time| {
             (
                 current_task_tcb.task_status,
-                current_task_tcb.dense_syscall_times,
+                current_task_tcb.syscall_times,
                 (get_time_us() - start_time) / 1000,
             )
         })
@@ -297,7 +297,7 @@ pub fn count_syscall(syscall_id: usize) {
 }
 
 /// Get the value of TaskInfo fields of current task.
-pub fn get_task_info() -> Option<(TaskStatus, [u32; NUM_IMPLEMENTED_SYSCALLS], usize)> {
+pub fn get_task_info() -> Option<(TaskStatus, [u32; MAX_SYSCALL_NUM], usize)> {
     TASK_MANAGER.get_task_info()
 }
 
