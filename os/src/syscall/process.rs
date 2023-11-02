@@ -52,7 +52,7 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// get [TaskInfo] of current task
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_task_info");
     if let Some((status, syscall_times, time)) = get_task_info() {
         let task_info = TaskInfo {
             status,
@@ -69,7 +69,7 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 ///
 /// This is a simplified version which only allocate memory
 pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_mmap");
     mmap(start, len, port)
 }
 
@@ -77,7 +77,7 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
 ///
 /// This is a simplified version which only deallocate memory
 pub fn sys_munmap(start: usize, len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_munmap");
     munmap(start, len)
 }
 
