@@ -72,6 +72,24 @@ impl MemorySet {
             self.areas.remove(idx);
         }
     }
+    /// Remove a framed area which has the matching start/end virtual page number
+    ///
+    /// Return -1 if there is no such matching area.
+    pub fn remove_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> isize {
+        let start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        if let Some(i) = self
+            .areas
+            .iter_mut()
+            .position(|a| a.vpn_range.get_start() == start_vpn && a.vpn_range.get_end() == end_vpn)
+        {
+            self.areas[i].unmap(&mut self.page_table);
+            self.areas.remove(i);
+            0
+        } else {
+            -1
+        }
+    }
     /// Add a new MapArea into this MemorySet.
     /// Assuming that there are no conflicts in the virtual address
     /// space.
