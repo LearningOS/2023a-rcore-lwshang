@@ -41,7 +41,7 @@ jobs:
           git clone https://github.com/LearningOS/rCore-Tutorial-Checker-2023A.git ci-user
           git clone https://github.com/LearningOS/rCore-Tutorial-Test-2023A.git ci-user/user
           ID=`git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]'`
-          cd ci-user && make test CHAPTER=$ID passwd=${{ secrets.BASE_TEST_TOKEN }} > ../output.txt
+          RUSTUP_DIST_SERVER=https://static.rust-lang.org RUSTUP_DIST_ROOT=https://static.rust-lang.org/dist cd ci-user && make test CHAPTER=$ID passwd=${{ secrets.BASE_TEST_TOKEN }} > ../output.txt
           # cd ci-user && make test CHAPTER=$ID passwd=${{ secrets.BASE_TEST_TOKEN }}
           cat ../output.txt
       - name: end
