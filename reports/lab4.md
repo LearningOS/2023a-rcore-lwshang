@@ -17,92 +17,29 @@
 
 ## 问答作业:
 
+### ch6
+
 ##### 1. 在我们的easy-fs中，root inode起着什么作用？如果root inode中的内容损坏了，会发生什么？
 
-p2 执行后，p2.stride 增加到 260，但 8 位无符号整数最大为 255，溢出变为 4。
+root inode 是唯一的根目录。
 
-4 < 255，仍然是 p2.stride 比较小，又轮到 p2 执行。
+若其中内容损坏，那么整个文件系统都将无法正常使用。
 
-##### 2. 在不考虑溢出的情况下 , 在进程优先级全部 >= 2 的情况下，如果严格按照算法执行，那么 STRIDE_MAX – STRIDE_MIN <= BigStride / 2。为什么？
+### ch7
 
-priority 越小，pass 越大，所以 pass 最大就是 PASS_MAX = BigStride / 2。
+##### 1. 举出使用 pipe 的一个实际应用的例子。
 
-接下来应用数学归纳法来证明：
-
-定义经过 n 轮调度时，stride 最大最小值的差为 
-```
-diff(n) = STRIDE_MAX(n) – STRIDE_MIN(n)
-```
-
-n = 0 时，一开始所有进程的 stride 都是 0，此时有
-```
-diff(0) = STRIDE_MAX(0) – STRIDE_MIN(0) = 0 - 0 = 0 <= PASS_MAX
-```
-
-假设 n = k 时命题成立，即 
+统计文件词数、行数等：
 
 ```
-diff(k) = STRIDE_MAX(k) – STRIDE_MIN(k) <= PASS_MAX
+cat file.txt | wc
 ```
 
-第 k 次调度时，有两种情况：
+相比起直接使用 `wc file.txt`， 使用管道的方法得到的输出没有结尾的文件名。
 
-* 被调度的进程，其 stride 增加，成为集合中的最大值，此时有
-```
-STRIDE_MIN(k + 1) >= STRIDE_MIN(k)
+##### 2. 如果需要在多个进程间互相通信，则需要为每一对进程建立一个管道，非常繁琐，请设计一个更易用的多进程通信机制。
 
-STRIDE_MIN(k) + PASS_MAX >= STRIDE_MAX(k + 1)
-
-diff(k + 1) = STRIDE_MAX(k + 1) – STRIDE_MIN(k + 1) <= PASS_MAX。
-```
-
-* 被调度后，stride 不是最大值，此时有
-
-```
-STRIDE_MIN(k + 1) >= STRIDE_MIN(k)
-
-STRIDE_MIN(k + 1) = STRIDE_MAX(k)
-
-diff(k + 1) = STRIDE_MAX(k + 1) – STRIDE_MIN(k + 1) <= STRIDE_MAX(k) – STRIDE_MIN(k) <= PASS_MAX
-```
-
-根据数学归纳法， `diff(n) <= PASS_MAX` 对任意正整数 n 均成立。
-
-##### 3. 补全比较器
-
-```rust
-use core::cmp::Ordering;
-
-struct Stride(u64);
-
-impl PartialOrd for Stride {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.0 == other.0 {
-            Some(Ordering::Equal)
-        } else if self.0 < other.0 {
-            let diff = other.0 - self.0;
-            if diff > u64::MAX / 2 {
-                Some(Ordering::Greater)
-            } else {
-                Some(Ordering::Less)
-            }
-        } else {
-            let diff = self.0 - other.0;
-            if diff > u64::MAX / 2 {
-                Some(Ordering::Less)
-            } else {
-                Some(Ordering::Greater)
-            }
-        }
-    }
-}
-
-impl PartialEq for Stride {
-    fn eq(&self, other: &Self) -> bool {
-        false
-    }
-}
-```
+多进程共享内存：一个进程向共享内存块写入数据，其他线程都可以看到。
 
 ## 荣誉准则
 
