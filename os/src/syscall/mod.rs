@@ -57,10 +57,11 @@ mod process;
 use fs::*;
 use process::*;
 
-use crate::fs::Stat;
+use crate::{fs::Stat, mm::translated_byte_buffer, task::current_user_token};
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
+    crate::task::count_syscall(syscall_id);
     match syscall_id {
         SYSCALL_OPEN => sys_open(args[1] as *const u8, args[2] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
@@ -83,5 +84,27 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_SPAWN => sys_spawn(args[0] as *const u8),
         SYSCALL_SET_PRIORITY => sys_set_priority(args[0] as isize),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
+    }
+}
+
+unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
+}
+
+fn set_val_in_user_memory<T: Sized>(ptr: *mut T, val: &T) -> isize {
+    let len = core::mem::size_of::<T>();
+    let buffers = translated_byte_buffer(current_user_token(), ptr as *const u8, len);
+    let value_bytes = unsafe { any_as_u8_slice(val) };
+    let mut start = 0;
+    for buffer in buffers {
+        let buffer_size = buffer.len();
+        let end = start + buffer_size;
+        buffer.copy_from_slice(&value_bytes[start..end]);
+        start = end;
+    }
+    if start == len {
+        0
+    } else {
+        -1
     }
 }
