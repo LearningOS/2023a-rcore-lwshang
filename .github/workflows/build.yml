@@ -5,6 +5,7 @@ on: [push]
 env:
   CARGO_TERM_COLOR: always
   rust_toolchain: nightly
+  CARGO_NET_RETRY: 10
 
 jobs:
   build-doc:

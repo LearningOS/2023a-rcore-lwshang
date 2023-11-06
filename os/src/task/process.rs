@@ -7,7 +7,8 @@ use super::{add_task, SignalFlags};
 use super::{pid_alloc, PidHandle};
 use crate::fs::{File, Stdin, Stdout};
 use crate::mm::{translated_refmut, MemorySet, KERNEL_SPACE};
-use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
+use crate::sync::{Condvar, Mutex, Resource, Semaphore, UPSafeCell};
+use crate::task::current_task_id;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -49,6 +50,8 @@ pub struct ProcessControlBlockInner {
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    /// enable deadlock check?
+    pub enable_deadlock_check: bool,
 }
 
 impl ProcessControlBlockInner {
@@ -81,6 +84,85 @@ impl ProcessControlBlockInner {
     /// get a task with tid in this process
     pub fn get_task(&self, tid: usize) -> Arc<TaskControlBlock> {
         self.tasks[tid].as_ref().unwrap().clone()
+    }
+    pub fn check_mutex(&self, mutex_id: usize) -> bool {
+        self.check_resource(mutex_id)
+    }
+    pub fn check_semaphore(&self, semaphore_id: usize) -> bool {
+        let offset = self.mutex_list.len();
+        let res_id = semaphore_id + offset;
+        self.check_resource(res_id)
+    }
+    fn check_resource(&self, res_id: usize) -> bool {
+        let n_tasks = self.tasks.len();
+        let n_mutex = self.mutex_list.len();
+        let n_sem = self.semaphore_list.len();
+        let n_res = n_mutex + n_sem;
+        assert!(n_tasks > 0);
+        assert!(n_res > 0);
+        let mut available: Vec<usize> = self
+            .mutex_list
+            .iter()
+            .map(|m| match m {
+                Some(mutex) => mutex.get_available(),
+                None => 0,
+            })
+            .collect();
+        available.append(
+            &mut self
+                .semaphore_list
+                .iter()
+                .map(|m| match m {
+                    Some(mutex) => mutex.get_available(),
+                    None => 0,
+                })
+                .collect(),
+        );
+        let mut allocation = vec![vec![0usize; n_res]; n_tasks];
+        let mut need = vec![vec![0usize; n_res]; n_tasks];
+        for (rid, m) in self.mutex_list.iter().enumerate() {
+            if let Some(mutex) = m {
+                mutex
+                    .get_allocation()
+                    .iter()
+                    .for_each(|(tid, amount)| allocation[*tid][rid] = *amount);
+                mutex
+                    .get_need()
+                    .iter()
+                    .for_each(|(tid, amount)| need[*tid][rid] = *amount);
+            }
+        }
+        for (rid, s) in self.semaphore_list.iter().enumerate() {
+            if let Some(sem) = s {
+                sem.get_allocation()
+                    .iter()
+                    .for_each(|(tid, amount)| allocation[*tid][rid] = *amount);
+                sem.get_need()
+                    .iter()
+                    .for_each(|(tid, amount)| need[*tid][rid] = *amount);
+            }
+        }
+
+        let mut work = available;
+        let mut finish = vec![false; n_tasks];
+        let tid = current_task_id().unwrap();
+        need[tid][res_id] += 1;
+        loop {
+            let mut executed = false;
+            for i in 0..n_tasks {
+                if !finish[i] {
+                    if (0..n_res).all(|j| need[i][j] <= work[j]) {
+                        (0..n_res).for_each(|j| work[j] += allocation[i][j]);
+                        finish[i] = true;
+                        executed = true;
+                    }
+                }
+            }
+            if !executed {
+                break;
+            }
+        }
+        finish.iter().all(|f| *f)
     }
 }
 
@@ -119,6 +201,7 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    enable_deadlock_check: false,
                 })
             },
         });
@@ -245,6 +328,7 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    enable_deadlock_check: false,
                 })
             },
         });
